@@ -26,13 +26,22 @@ public class RedisMessageController {
     @PostMapping("/publish")
     public String publishMessage(@RequestParam String topic, @RequestParam String message) {
     	// Check if topic exists, if not, create it (publish first message)
+    	String response;
         if (!isTopicPresent(topic)) {
             createTopic(topic, message);
+            response = "Topic created and message published to " + topic;
+
         } else {
             // Overwrite the message if the topic already exists (just publish again)
             jedis.publish(topic, message);
+            response = "Message published to existing topic: " + topic;
+
         }
-        return "Message published to " + topic;
+        String storedMessage = jedis.get(topic);
+        response += "\nMessage details:\nTopic: " + topic + "\nMessage: " + storedMessage;
+        System.out.println(response);
+
+        return response;
     }
 
     // API to create a topic (topic creation is implicit by using it for publishing)
@@ -75,11 +84,7 @@ public class RedisMessageController {
 
     // Create topic by publishing the message
     private void createTopic(String topic, String message) {
-        System.out.println("Checking Redis connection...");  // Debugging output
         
-        // Try a simple Redis command to verify the connection
-        String pingResponse = jedis.ping();
-        System.out.println("Redis ping response: " + pingResponse);  // Should return "PONG"
         
         jedis.sadd(TOPICS_KEY, topic);
         System.out.println("Added topic: " + topic);  // Debugging output
@@ -95,12 +100,12 @@ public class RedisMessageController {
         try {
             // Check if Redis connection is available
             String pingResponse = jedis.ping();
-            System.out.println("Redis ping response: " + pingResponse);  // Should return "PONG"
 
             if ("PONG".equals(pingResponse)) {
                 // Fetch the list of topics from the Redis Set
                 topics = jedis.smembers(TOPICS_KEY);  // Get topics from Redis set
                 System.out.println("Fetched topics from Redis: " + topics);  // Debugging output
+                System.out.println("Fethed message from Redis");
             } else {
                 System.err.println("Redis server not responding as expected.");
             }
